@@ -5,6 +5,7 @@ use claude_code_proxy::{
     monitor::MonitorHandle,
     paths,
     registry::{ANTHROPIC_STYLE_ALIASES, Registry},
+    serve_hook,
     server::{self, ServerConfig},
     tui::{self, MonitorExit, MonitorUiConfig},
 };
@@ -100,6 +101,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         Commands::Serve { port, no_monitor } => {
+            run_serve_preflight();
             let bind_address = config::bind_address();
             let effective_port = port.unwrap_or_else(config::port);
             let registry = Registry::with_default_alias();
@@ -283,6 +285,30 @@ fn select_serve_mode(stdout_is_tty: bool, no_monitor: bool) -> ServeMode {
         ServeMode::Monitor
     } else {
         ServeMode::Plain
+    }
+}
+
+/// Run the catalog-sync pre-flight for the serve path, print and log the
+/// one-line outcome summary, and re-exec the freshly installed binary when the
+/// sync reported an update. All other subcommands skip this entirely.
+fn run_serve_preflight() {
+    let outcome = serve_hook::run_preflight();
+    let summary = outcome.summary();
+    println!("{summary}");
+
+    let logger = logging::create_logger("sync");
+    if outcome.is_failure() {
+        logger.warn(&summary, None);
+    } else {
+        logger.info(&summary, None);
+    }
+
+    if matches!(outcome, serve_hook::Outcome::Updated) {
+        if let Err(error) = serve_hook::reexec_self() {
+            let warning = format!("ccp-sync: {error}; serving the existing binary");
+            println!("{warning}");
+            logging::create_logger("sync").warn(&warning, None);
+        }
     }
 }
 

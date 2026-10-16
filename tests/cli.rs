@@ -199,6 +199,8 @@ fn plain_service_exits_on_second_signal(signal: &str) -> Result<(), Box<dyn std:
     let child = std::process::Command::new(env!("CARGO_BIN_EXE_claude-code-proxy"))
         .args(["serve", "--no-monitor", "--port", &port.to_string()])
         .env("CCP_CONFIG_DIR", config.path())
+        .env("CCP_SYNC_ON_SERVE", "0")
+        .env("XDG_STATE_HOME", config.path())
         .env("CCP_KIMI_BASE_URL", upstream_url)
         .env("NO_PROXY", "127.0.0.1,localhost")
         .env("no_proxy", "127.0.0.1,localhost")

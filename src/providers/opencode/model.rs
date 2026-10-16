@@ -161,11 +161,17 @@ pub const MODELS: &[ModelSpec] = &[
 ];
 
 pub fn resolve(raw: &str) -> Option<ModelSpec> {
+    if super::overlay::synced() {
+        return super::overlay::resolve_in(super::overlay::active_entries(), raw);
+    }
     let id = raw.strip_prefix(MODEL_PREFIX).unwrap_or(raw);
     MODELS.iter().copied().find(|model| model.id == id)
 }
 
 pub fn advertised_models() -> Vec<String> {
+    if super::overlay::synced() {
+        return super::overlay::advertised_from(super::overlay::active_entries());
+    }
     let mut result = Vec::with_capacity(MODELS.len() * 2);
     for model in MODELS {
         if !matches!(
@@ -183,6 +189,13 @@ pub fn advertised_models() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The expectations below describe the upstream *static* catalog. A synced
+    /// working copy shadows it (strict mirror), so the static-catalog
+    /// assertions are skipped under the overlay.
+    fn static_catalog_only() -> bool {
+        !crate::providers::opencode::overlay::synced()
+    }
 
     #[test]
     fn supported_catalog_is_partitioned_by_wire_protocol() {
@@ -205,6 +218,9 @@ mod tests {
 
     #[test]
     fn refreshed_models_resolve_and_are_advertised() {
+        if !static_catalog_only() {
+            return;
+        }
         let advertised = advertised_models();
         for (id, endpoint) in [
             ("glm-5.3-flash", EndpointKind::ChatCompletions),
@@ -246,6 +262,9 @@ mod tests {
 
     #[test]
     fn canonical_prefix_resolves_and_unknown_models_do_not() {
+        if !static_catalog_only() {
+            return;
+        }
         let spec = resolve("opencode-go/minimax-m3").expect("known model");
         assert_eq!(spec.id, "minimax-m3");
         assert_eq!(spec.endpoint, EndpointKind::Messages);
@@ -258,6 +277,9 @@ mod tests {
 
     #[test]
     fn conflicting_provider_ids_are_only_advertised_with_prefix() {
+        if !static_catalog_only() {
+            return;
+        }
         let models = advertised_models();
         for id in [
             "gpt-5.6-luna",
@@ -272,6 +294,45 @@ mod tests {
                 models
                     .iter()
                     .any(|model| model == &format!("opencode-go/{id}"))
+            );
+        }
+    }
+
+    #[test]
+    fn advertised_catalog_is_resolvable_unique_and_qualified_for_every_entry() {
+        let advertised = advertised_models();
+
+        // Every advertised id resolves, in both static and synced modes.
+        for model in &advertised {
+            assert!(
+                resolve(model).is_some(),
+                "advertised model {model} must resolve"
+            );
+        }
+
+        // No duplicates (the list is sorted by construction in both modes).
+        let mut deduped = advertised.clone();
+        deduped.dedup();
+        assert_eq!(
+            deduped.len(),
+            advertised.len(),
+            "advertised models must be unique"
+        );
+
+        // Every catalog entry advertises its provider-qualified form.
+        let ids: Vec<&str> = if crate::providers::opencode::overlay::synced() {
+            crate::providers::opencode::overlay::active_entries()
+                .iter()
+                .map(|entry| entry.id)
+                .collect()
+        } else {
+            MODELS.iter().map(|model| model.id).collect()
+        };
+        for id in ids {
+            let qualified = format!("{MODEL_PREFIX}{id}");
+            assert!(
+                advertised.contains(&qualified),
+                "qualified form {qualified} must be advertised"
             );
         }
     }

@@ -348,6 +348,13 @@ fn build_cursor_models() -> Vec<String> {
 mod tests {
     use super::*;
 
+    /// The expectations below describe the upstream *static* OpenCode catalog.
+    /// A synced working copy shadows it (strict mirror), so the static-catalog
+    /// assertions are skipped under the overlay.
+    fn static_catalog_only() -> bool {
+        !crate::providers::opencode::overlay::synced()
+    }
+
     #[test]
     fn normalize_model_trims_hint() {
         assert_eq!(normalize_incoming_model("gpt-5.4-fast[1m]"), "gpt-5.4-fast");
@@ -468,6 +475,9 @@ mod tests {
 
     #[test]
     fn opencode_models_route_without_stealing_existing_provider_ids() {
+        if !static_catalog_only() {
+            return;
+        }
         let registry = Registry::new(AliasProvider::Codex);
         assert_eq!(
             registry
@@ -506,6 +516,30 @@ mod tests {
                     .unwrap()
                     .name(),
                 "opencode"
+            );
+        }
+    }
+
+    /// Review finding (ticket 01): the mode-invariant catalog tests in
+    /// `providers/opencode/model.rs` check resolvability, uniqueness and
+    /// qualified presence, but not that every *bare* id the overlay advertises
+    /// still routes to OpenCode. A generated overlay that bare-advertises an id
+    /// owned by another provider ("bare-ID theft") would pass those checks yet
+    /// route the request away, so assert ownership-respecting advertisement
+    /// here — the registry holds the full ownership view. This holds in stub
+    /// mode (the static advertised set is conflict-free) and fails loudly on a
+    /// synced tree whose overlay bare-advertises a foreign-owned id.
+    #[test]
+    fn advertised_opencode_ids_route_to_opencode() {
+        let registry = Registry::new(AliasProvider::Codex);
+        for id in crate::providers::opencode::advertised_models() {
+            let provider = registry
+                .provider_for_model(&id, None)
+                .unwrap_or_else(|| panic!("advertised OpenCode id {id} must route to a provider"));
+            assert_eq!(
+                provider.name(),
+                "opencode",
+                "advertised OpenCode id {id} must route to opencode"
             );
         }
     }

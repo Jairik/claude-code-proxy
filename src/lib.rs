@@ -11,6 +11,7 @@ pub mod providers;
 pub mod registry;
 pub mod request_identity;
 pub mod retry;
+pub mod serve_hook;
 pub mod server;
 pub mod session;
 pub mod traffic;
