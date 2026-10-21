@@ -1,0 +1,3 @@
+__pycache__/
+*.pyc
+patched-files.sha256

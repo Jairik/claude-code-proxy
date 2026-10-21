@@ -39,6 +39,18 @@ enum Commands {
         #[arg(long = "no-monitor", action = ArgAction::SetTrue)]
         no_monitor: bool,
     },
+    /// Sync the OpenCode Go catalog and rebuild the proxy if needed
+    Sync {
+        /// Force a gated rebuild+install even when the catalog is unchanged
+        #[arg(long)]
+        force: bool,
+        /// Show what would change without writing, building, or installing
+        #[arg(long = "dry-run")]
+        dry_run: bool,
+        /// Generate the catalog only; skip the gate, build and install
+        #[arg(long = "no-install")]
+        no_install: bool,
+    },
     /// Attach a read-only dashboard to a running proxy
     Monitor {
         #[arg(long)]
@@ -160,6 +172,11 @@ fn main() -> Result<()> {
                 }
             }
         }
+        Commands::Sync {
+            force,
+            dry_run,
+            no_install,
+        } => run_sync(force, dry_run, no_install),
         Commands::Demo => {
             let registry = Registry::with_default_alias();
             tui::run_mock_monitor(config::port(), &registry)
@@ -285,6 +302,30 @@ fn select_serve_mode(stdout_is_tty: bool, no_monitor: bool) -> ServeMode {
         ServeMode::Monitor
     } else {
         ServeMode::Plain
+    }
+}
+
+/// Run the catalog sync on demand for the `sync` subcommand.
+///
+/// Exit code 0 (no change) and 2 (updated and installed) are success: the sync
+/// already installed the new binary, and an explicit invocation must not
+/// re-exec (the operator can restart `serve` when ready). Anything else is an
+/// error carrying the script's exit code.
+fn run_sync(force: bool, dry_run: bool, no_install: bool) -> Result<()> {
+    let mut args = Vec::new();
+    if force {
+        args.push("--force".to_string());
+    }
+    if dry_run {
+        args.push("--dry-run".to_string());
+    }
+    if no_install {
+        args.push("--no-install".to_string());
+    }
+    match serve_hook::run_sync_cli(&args) {
+        Ok(0) | Ok(2) => Ok(()),
+        Ok(code) => Err(anyhow::anyhow!("sync script exited with code {code}")),
+        Err(error) => Err(anyhow::anyhow!(error)),
     }
 }
 

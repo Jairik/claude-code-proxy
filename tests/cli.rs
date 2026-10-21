@@ -1,6 +1,7 @@
 use assert_cmd::Command;
 use predicates::str::contains;
 use std::env;
+use std::fs;
 #[cfg(unix)]
 use std::{
     io::{Read, Write},
@@ -53,6 +54,7 @@ fn help_describes_visible_commands_and_hides_demo() -> Result<(), Box<dyn std::e
     for description in [
         "Print version information",
         "Start the proxy server and monitor",
+        "Sync the OpenCode Go catalog",
         "List supported provider models",
         "Manage Codex authentication",
         "Manage Kimi authentication",
@@ -63,6 +65,82 @@ fn help_describes_visible_commands_and_hides_demo() -> Result<(), Box<dyn std::e
     }
     assert!(!stdout.contains("demo"));
     assert!(!stdout.contains("mock data and no proxy server"));
+    Ok(())
+}
+
+#[test]
+fn sync_help_documents_the_explicit_rebuild_flag() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("claude-code-proxy")?;
+    let output = cmd.args(["sync", "--help"]).output()?;
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout)?;
+    for token in ["--force", "--dry-run", "--no-install"] {
+        assert!(stdout.contains(token), "missing: {token}");
+    }
+    Ok(())
+}
+
+#[test]
+fn sync_forwards_flags_and_accepts_updated_exit() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+    let repo = temp.path().join("repo");
+    fs::create_dir_all(&repo)?;
+    let args_log = temp.path().join("args.log");
+    let script = temp.path().join("sync.py");
+    fs::write(
+        &script,
+        format!(
+            "import pathlib, sys\npathlib.Path({log:?}).write_text(' '.join(sys.argv[1:]))\nsys.exit(2)\n",
+            log = args_log.display().to_string()
+        ),
+    )?;
+
+    Command::cargo_bin("claude-code-proxy")?
+        .args(["sync", "--force", "--dry-run", "--no-install"])
+        .env("CCP_SYNC_REPO", &repo)
+        .env("CCP_SYNC_SCRIPT", &script)
+        .assert()
+        .success();
+
+    assert_eq!(
+        fs::read_to_string(&args_log)?,
+        "--force --dry-run --no-install"
+    );
+    Ok(())
+}
+
+#[test]
+fn sync_failure_exits_nonzero() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+    let repo = temp.path().join("repo");
+    fs::create_dir_all(&repo)?;
+    let script = temp.path().join("sync.py");
+    fs::write(&script, "import sys\nsys.exit(1)\n")?;
+
+    let output = Command::cargo_bin("claude-code-proxy")?
+        .arg("sync")
+        .env("CCP_SYNC_REPO", &repo)
+        .env("CCP_SYNC_SCRIPT", &script)
+        .output()?;
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("sync script exited with code 1"));
+    Ok(())
+}
+
+#[test]
+fn sync_reports_a_missing_script() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+    let repo = temp.path().join("repo");
+    fs::create_dir_all(&repo)?;
+    let missing = temp.path().join("nope.py");
+
+    Command::cargo_bin("claude-code-proxy")?
+        .arg("sync")
+        .env("CCP_SYNC_REPO", &repo)
+        .env("CCP_SYNC_SCRIPT", &missing)
+        .assert()
+        .failure()
+        .stderr(contains("sync script not found"));
     Ok(())
 }
 

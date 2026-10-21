@@ -1,0 +1,29 @@
+# Overrides master for the OpenCode Go catalog sync (hand-maintained).
+#
+# This file is the durable master kept in the kit; it is never regenerated.
+# It is applied on top of the live OpenCode Go model list joined with the
+# official endpoint table. Precedence: exclude > pin > scraped.
+#
+# Parsed with tomllib (Python 3 stdlib). Edit by hand, then restart serve.
+
+# ---------------------------------------------------------------------------
+# Exclusions: suppress a model no matter what the live list says.
+# A list of bare model IDs (the ID as it appears in the live list / docs table).
+# ---------------------------------------------------------------------------
+exclude = []
+
+# ---------------------------------------------------------------------------
+# Pins: force a model into the catalog with an explicit wire protocol.
+# A pin is included even when the id is in NEITHER the live list NOR the
+# documented endpoint table (fully manual), and its protocol wins over any
+# scraped value. protocol must be one of:
+#   ChatCompletions | Messages | Responses
+# ---------------------------------------------------------------------------
+# [[pins]]
+# id = "gemini-4-argon-contributor"
+# protocol = "Responses"
+# reason = "Google-native endpoint; pin to Responses"
+#
+# [[pins]]
+# id = "kimi-k3"
+# protocol = "ChatCompletions"

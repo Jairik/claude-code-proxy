@@ -54,6 +54,23 @@ install-dev:
 run *ARGS:
     cargo run -- "$@"
 
+# Copy the versioned OpenCode Go sync kit into the serve hook's default location
+sync-kit-install:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dest="${CCP_SYNC_KIT:-$HOME/.local/share/claude-code-proxy-sync}"
+    mkdir -p "$dest"
+    cp -a local/opencode-go-sync/. "$dest/"
+
+# Copy the live sync kit back into the versioned directory after editing it in place
+sync-kit-capture:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    src="${CCP_SYNC_KIT:-$HOME/.local/share/claude-code-proxy-sync}"
+    cp -a "$src/." local/opencode-go-sync/
+    rm -rf local/opencode-go-sync/__pycache__ local/opencode-go-sync/tests/__pycache__
+    rm -f local/opencode-go-sync/patched-files.sha256
+
 # Build and open the monitor demo in a running CuaBot session
 cua-monitor-demo session:
     scripts/cua-monitor-demo '{{session}}'

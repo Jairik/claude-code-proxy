@@ -208,10 +208,35 @@ pub fn run_preflight_with_env(
     }
 }
 
+/// Run the sync script directly for the `sync` subcommand, forwarding `args`.
+///
+/// Unlike the serve pre-flight this does not classify the result or re-exec:
+/// the CLI maps exit code 0 (no change) and 2 (updated and installed) to
+/// success, and anything else to an error. The script's stdio is inherited so
+/// its summary and exclusion reasons stay visible.
+pub fn run_sync_cli(args: &[String]) -> Result<i32, String> {
+    let env: HashMap<String, String> = std::env::vars().collect();
+    let paths = resolve_paths(&env);
+    if !paths.repo.is_dir() {
+        return Err(format!("working copy not found: {}", paths.repo.display()));
+    }
+    if !paths.script.is_file() {
+        return Err(format!("sync script not found: {}", paths.script.display()));
+    }
+    match spawn_script_with_args(&paths.script, args) {
+        ScriptResult::Exited(code) => Ok(code),
+        ScriptResult::SpawnError(error) => Err(format!("could not run sync script: {error}")),
+    }
+}
+
 fn spawn_script(script: &Path) -> ScriptResult {
+    spawn_script_with_args(script, &[])
+}
+
+fn spawn_script_with_args(script: &Path, args: &[String]) -> ScriptResult {
     // The kit's sync script is a Python 3 program (stdlib only); run it with
     // the system interpreter. Its stdio is inherited so progress is visible.
-    match Command::new("python3").arg(script).status() {
+    match Command::new("python3").arg(script).args(args).status() {
         Ok(status) => ScriptResult::Exited(status.code().unwrap_or(-1)),
         Err(error) => ScriptResult::SpawnError(error.to_string()),
     }
