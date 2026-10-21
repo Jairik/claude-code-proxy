@@ -30,11 +30,11 @@ pub const ENTRIES: &[SyncedEntry] = &[
     SyncedEntry { id: "mimo-v2.6-flash", endpoint: EndpointKind::ChatCompletions, advert: Advertisement::BareAndQualified },
     SyncedEntry { id: "mimo-v2.6-pro", endpoint: EndpointKind::ChatCompletions, advert: Advertisement::BareAndQualified },
     SyncedEntry { id: "minimax-m3", endpoint: EndpointKind::Messages, advert: Advertisement::BareAndQualified },
+    SyncedEntry { id: "minimax-m3.1-flash-free", endpoint: EndpointKind::ChatCompletions, advert: Advertisement::BareAndQualified },
     SyncedEntry { id: "muse-spark-1.2-contributor", endpoint: EndpointKind::Responses, advert: Advertisement::BareAndQualified },
     SyncedEntry { id: "muse-spark-1.3-contributor", endpoint: EndpointKind::Responses, advert: Advertisement::BareAndQualified },
     SyncedEntry { id: "qwen3.7-plus", endpoint: EndpointKind::Messages, advert: Advertisement::BareAndQualified },
     SyncedEntry { id: "qwen3.8-flash", endpoint: EndpointKind::Messages, advert: Advertisement::BareAndQualified },
     SyncedEntry { id: "qwen3.8-max", endpoint: EndpointKind::Messages, advert: Advertisement::BareAndQualified },
-    SyncedEntry { id: "space-bunny", endpoint: EndpointKind::ChatCompletions, advert: Advertisement::BareAndQualified },
     SyncedEntry { id: "step-5-preview", endpoint: EndpointKind::ChatCompletions, advert: Advertisement::BareAndQualified },
 ];
